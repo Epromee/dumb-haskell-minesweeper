@@ -21,3 +21,4 @@ And then do this:
 * Flags for marking mines aren't implemented yet
 * The initial input is not checked
 * Bad code for Haskell standards
+* Lists are used instead of Arrays for random access, which is a fatal bullshit but who cares
