@@ -5,6 +5,8 @@ import System.Random
 import Numeric
 import Data.List
 import Data.List.Split
+import System.IO
+import System.Console.ANSI -- "cabal install ansi-terminal"
 
 -- NOT GAME:
 
@@ -168,10 +170,10 @@ movePtr dx dy field = SapperField width height cells (replicate (width * height)
         newY = mod (ptrY + dy) height
 
 doByPrompt field prompt
-    | prompt == "u" = movePtr 0 (-1) field
-    | prompt == "d" = movePtr 0 1 field
-    | prompt == "l" = movePtr (-1) 0 field
-    | prompt == "r" = movePtr 1 0 field
+    | prompt == "w" = movePtr 0 (-1) field
+    | prompt == "s" = movePtr 0 1 field
+    | prompt == "a" = movePtr (-1) 0 field
+    | prompt == "d" = movePtr 1 0 field
     | prompt == "x" = openFieldAtPtr field
     | otherwise = field
 
@@ -212,27 +214,47 @@ repPromptInt first onError rePrompt onSuccess = do
         putStrLn onSuccess
         return $ fromMaybe 0 fValueMb
 
+coolClearScreen = setCursorPosition 0 0 >> clearFromCursorToScreenEnd >> setCursorPosition 0 0
+
+drawHelp = do
+    putStrLn ""
+    putStrLn "a - left"
+    putStrLn "d - right"
+    putStrLn "w - up"
+    putStrLn "s - down"
+    putStrLn "x - open"
+    putStrLn "e - put flag (not implemented)"
+    putStrLn ""
+
+drawFieldCool header field expose = do
+    coolClearScreen
+    putStrLn ""
+    putStrLn header
+    putStrLn ""
+    putStrLn $ drawField expose field
+    drawHelp
+
 gameLoopPlaying field = do
-    putStrLn $ drawField False field
-    prompt <- getLine
+    drawFieldCool "Game in progress" field False
+    pc <- (hGetChar stdin) --getLine
+    let prompt = [pc]    
     putStrLn ""
     let newField = doByPrompt field prompt
     processPlayerState newField
     where
         processPlayerState field
             | isLost field = do
-                putStrLn "YOU LOST!!!"
-                putStrLn $ drawField False field
+                drawFieldCool "You LOST! :(" field True
             | isWon field = do
-                putStrLn "YOU WON!!!"
-                putStrLn $ drawField False field
+                drawFieldCool "You WON! :D" field False
             | otherwise = do
                 gameLoopPlaying field
 
 gameLoopMain = do
-    fWidth <- return 16 -- repPromptInt "Enter field width:" "Wrong value" "Enter field width again:" "Width set\n"
-    fHeight <- return 12 -- repPromptInt "Enter field height:" "Wrong value" "Enter field height again:" "Height set\n"
-    fMines <- return 10 --repPromptInt "Enter mines count:" "Wrong value" "Enter mines count again:" "Mines set\n"
+    fWidth <- repPromptInt "Enter field width:" "Wrong value" "Enter field width again:" "Width set\n"
+    fHeight <- repPromptInt "Enter field height:" "Wrong value" "Enter field height again:" "Height set\n"
+    fMines <- repPromptInt "Enter mines count:" "Wrong value" "Enter mines count again:" "Mines set\n"
+    clearScreen >> (hSetEcho stdin False) >> (hSetBuffering stdin NoBuffering)
     let fSize = fWidth * fHeight
     listMask <- twistList $ makeDichoList (fSize - 1) fMines -- We need the first list to be 1 step shorter as we insert a safe field
     let initialScList = (map (\x -> SapperCell False (x == 1)) listMask) -- ++ [SapperCell False False]
