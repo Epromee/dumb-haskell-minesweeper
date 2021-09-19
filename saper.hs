@@ -56,7 +56,19 @@ data SapperField = SapperField {
         , sfPtrY :: Int
     } deriving (Show)
 
-safeFirstMove field sx sy = SapperField width height newCells [] ptrX ptrY
+isLost field = isAtLeastOneOpenMine
+    where
+        cells = sfData field
+        isEachOpenMine = map (\c -> (scIsMined c) && (scIsOpened c)) cells
+        isAtLeastOneOpenMine = foldl (||) False isEachOpenMine
+
+isWon field = not isAtLeastOneUnopen
+    where
+        cells = sfData field
+        isEachUnopen = map (\c -> not (scIsMined c) && not(scIsOpened c)) cells
+        isAtLeastOneUnopen = foldl (||) False isEachUnopen
+
+safeFirstMove field sx sy = SapperField width height newCells (replicate (width * height) False) ptrX ptrY
     where        
         cells = sfData field
         width = sfWidth field
@@ -95,7 +107,7 @@ isPtrAt field sx sy = (sfPtrX field) == sx && (sfPtrY field) == sy
 
 setOpened opened cell = SapperCell (opened) (scIsMined cell)
 
-updFieldAt field mapper sx sy = SapperField width height newCells [] ptrX ptrY
+updFieldAt field mapper sx sy = if isOutsider then field else newField
     where        
         cells = sfData field
         width = sfWidth field
@@ -105,6 +117,8 @@ updFieldAt field mapper sx sy = SapperField width height newCells [] ptrX ptrY
         accessor = (sx + sy * width)
         newCell = mapper (cells !! accessor)
         newCells = updListAt accessor newCell cells
+        isOutsider = isOutsiderAt field sx sy
+        newField = SapperField width height newCells (replicate (width * height) False) ptrX ptrY
 
 surrScanMask = [(x, y) | x <- iter, y <- iter] \\ [(0, 0)]
     where
@@ -136,7 +150,6 @@ openFieldDeepAt field sx sy = newField
         newField = if isOutsider || (isMined == 1) || (isOpened == 1) || (surrs > 0)
             then newShallowField
             else updatedField
-        
 
 openFieldAtPtr field = openFieldDeepAt safeField ptrX ptrY
     where 
@@ -144,7 +157,7 @@ openFieldAtPtr field = openFieldDeepAt safeField ptrX ptrY
         ptrX = sfPtrX field
         ptrY = sfPtrY field
 
-movePtr dx dy field = SapperField width height cells [] newX newY
+movePtr dx dy field = SapperField width height cells (replicate (width * height) False) newX newY
     where
         cells = sfData field
         width = sfWidth field
@@ -166,9 +179,9 @@ drawAtCellByField field sx sy str = [sel !! 0] ++ str ++ [sel !! 1]
     where
         sel = if isPtrAt field sx sy then "[]" else "  "
 
-drawEnumCellBySurr textSurr drawAtCell (cell, x, y) = drawAtCell x y $ if (not $ scIsOpened cell) then "~" else if (scIsMined cell) then "@" else (textSurr x y)
+drawEnumCellBySurr allShown textSurr drawAtCell (cell, x, y) = drawAtCell x y $ if (not $ scIsOpened cell) && (not allShown) then "~" else if (scIsMined cell) then "@" else (textSurr x y)
 
-drawField field = drawField allRowSplit
+drawField allShown field = drawField allRowSplit
     where
         preCells = sfData field
         width = sfWidth field
@@ -182,7 +195,7 @@ drawField field = drawField allRowSplit
         surr = surroundingsAt field        
         textSurr sx sy = if (srNum == 0) then "." else show srNum where srNum = surr sx sy
         drawAtCell = drawAtCellByField field
-        drawEnumCell = drawEnumCellBySurr textSurr drawAtCell
+        drawEnumCell = drawEnumCellBySurr allShown textSurr drawAtCell
         drawRow row = "=|" ++ (foldr (++) "" (map drawEnumCell row)) ++ "|=\n"
         horFrame = (replicate (width * 3 + 4) '=') ++ "\n"
         drawField fld = horFrame ++ (foldr (++) "" (map drawRow fld)) ++ horFrame
@@ -200,20 +213,30 @@ repPromptInt first onError rePrompt onSuccess = do
         return $ fromMaybe 0 fValueMb
 
 gameLoopPlaying field = do
-    putStrLn $ drawField field
+    putStrLn $ drawField False field
     prompt <- getLine
     putStrLn ""
     let newField = doByPrompt field prompt
-    gameLoopPlaying newField
+    processPlayerState newField
+    where
+        processPlayerState field
+            | isLost field = do
+                putStrLn "YOU LOST!!!"
+                putStrLn $ drawField False field
+            | isWon field = do
+                putStrLn "YOU WON!!!"
+                putStrLn $ drawField False field
+            | otherwise = do
+                gameLoopPlaying field
 
 gameLoopMain = do
     fWidth <- return 16 -- repPromptInt "Enter field width:" "Wrong value" "Enter field width again:" "Width set\n"
-    fHeight <- return 8 -- repPromptInt "Enter field height:" "Wrong value" "Enter field height again:" "Height set\n"
-    fMines <- return 20 --repPromptInt "Enter mines count:" "Wrong value" "Enter mines count again:" "Mines set\n"
+    fHeight <- return 12 -- repPromptInt "Enter field height:" "Wrong value" "Enter field height again:" "Height set\n"
+    fMines <- return 10 --repPromptInt "Enter mines count:" "Wrong value" "Enter mines count again:" "Mines set\n"
     let fSize = fWidth * fHeight
     listMask <- twistList $ makeDichoList (fSize - 1) fMines -- We need the first list to be 1 step shorter as we insert a safe field
     let initialScList = (map (\x -> SapperCell False (x == 1)) listMask) -- ++ [SapperCell False False]
-    let sapperField = SapperField fWidth fHeight initialScList [] 4 4
+    let sapperField = SapperField fWidth fHeight initialScList (replicate fSize False) 1 1
     gameLoopPlaying sapperField
 
 main = gameLoopMain
