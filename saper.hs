@@ -70,7 +70,7 @@ isWon field = not isAtLeastOneUnopen
         isEachUnopen = map (\c -> not (scIsMined c) && not(scIsOpened c)) cells
         isAtLeastOneUnopen = foldl (||) False isEachUnopen
 
-safeFirstMove field sx sy = SapperField width height newCells (replicate (width * height) False) ptrX ptrY
+safeFirstMove field sx sy = field { sfData = newCells }
     where        
         cells = sfData field
         width = sfWidth field
@@ -86,10 +86,7 @@ safifyAt field sx sy = if (length cells) == width * height then field else safeF
         width = sfWidth field
         height = sfHeight field
 
-isOutsiderAt field sx sy = (sx < 0) || (sx > width - 1) || (sy < 0) || (sy > height - 1)
-    where
-        width = sfWidth field
-        height = sfHeight field
+isOutsiderAt field sx sy = (sx < 0) || (sx > sfWidth field - 1) || (sy < 0) || (sy > sfHeight field - 1)
 
 isWtfAt wtf dummy field sx sy = if outsider
         then dummy
@@ -107,7 +104,7 @@ isMinedAt = isWtfAt scIsMined 0
 isOpenedAt = isWtfAt scIsOpened 1
 isPtrAt field sx sy = (sfPtrX field) == sx && (sfPtrY field) == sy
 
-setOpened opened cell = SapperCell (opened) (scIsMined cell)
+setOpened opened cell = cell { scIsOpened = opened }
 
 updFieldAt field mapper sx sy = if isOutsider then field else newField
     where        
@@ -120,7 +117,7 @@ updFieldAt field mapper sx sy = if isOutsider then field else newField
         newCell = mapper (cells !! accessor)
         newCells = updListAt accessor newCell cells
         isOutsider = isOutsiderAt field sx sy
-        newField = SapperField width height newCells (replicate (width * height) False) ptrX ptrY
+        newField = field { sfData = newCells }
 
 surrScanMask = [(x, y) | x <- iter, y <- iter] \\ [(0, 0)]
     where
@@ -159,7 +156,7 @@ openFieldAtPtr field = openFieldDeepAt safeField ptrX ptrY
         ptrX = sfPtrX field
         ptrY = sfPtrY field
 
-movePtr dx dy field = SapperField width height cells (replicate (width * height) False) newX newY
+movePtr dx dy field = field { sfPtrX = newX, sfPtrY = newY }
     where
         cells = sfData field
         width = sfWidth field
