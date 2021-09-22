@@ -73,18 +73,12 @@ isWon field = not isAtLeastOneUnopen
 safeFirstMove field sx sy = field { sfData = newCells }
     where        
         cells = sfData field
-        width = sfWidth field
-        height = sfHeight field
-        ptrX = sfPtrX field
-        ptrY = sfPtrY field
-        accessor = (sx + sy * width)
+        accessor = (sx + sy * sfWidth field)
         newCells = insertBetween accessor (SapperCell False False) cells
 
-safifyAt field sx sy = if (length cells) == width * height then field else safeFirstMove field sx sy
+safifyAt field sx sy = if (length cells) == (sfWidth field * sfHeight field) then field else safeFirstMove field sx sy
     where        
         cells = sfData field
-        width = sfWidth field
-        height = sfHeight field
 
 isOutsiderAt field sx sy = (sx < 0) || (sx > sfWidth field - 1) || (sy < 0) || (sy > sfHeight field - 1)
 
@@ -109,11 +103,7 @@ setOpened opened cell = cell { scIsOpened = opened }
 updFieldAt field mapper sx sy = if isOutsider then field else newField
     where        
         cells = sfData field
-        width = sfWidth field
-        height = sfHeight field
-        ptrX = sfPtrX field
-        ptrY = sfPtrY field
-        accessor = (sx + sy * width)
+        accessor = (sx + sy * sfWidth field)
         newCell = mapper (cells !! accessor)
         newCells = updListAt accessor newCell cells
         isOutsider = isOutsiderAt field sx sy
